@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lifetime</title>
+<meta name="description" content="Count every day, minute and full moon since someone was born.">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Lifetime">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<style>
+  :root {
+    --bg: #f2f2f7; --card: #ffffff; --text: #000; --secondary: #6c6c70; --sep: #d1d1d6;
+    --accent: #e8428c; --danger: #ff3b30; --field: #f2f2f7;
+    --radius: 20px;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --rounded: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #000; --card: #1c1c1e; --text: #fff; --secondary: #98989f; --sep: #38383a; --field: #2c2c2e; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); }
+  body { min-height: 100vh; min-height: 100dvh; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 0 16px calc(32px + env(safe-area-inset-bottom)); }
+
+  /* Navigation bar */
+  .nav { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 82%, transparent);
+         backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+         padding-top: env(safe-area-inset-top); }
+  .nav-inner { max-width: 640px; margin: 0 auto; height: 44px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .nav-title { font-weight: 600; font-size: 17px; text-align: center; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-btn { color: var(--accent); font-size: 17px; min-width: 60px; text-align: left; padding: 8px 0; }
+  .nav-btn.right { text-align: right; }
+  .nav-btn.plus { font-size: 28px; line-height: 1; font-weight: 300; }
+  .large-title { font-size: 34px; font-weight: 700; margin: 4px 0 12px; letter-spacing: .3px; }
+
+  /* List */
+  .list { background: var(--card); border-radius: 12px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; width: 100%; text-align: left; position: relative; }
+  .row + .row::before { content: ""; position: absolute; top: 0; left: 72px; right: 0; border-top: .5px solid var(--sep); }
+  .row:active { background: color-mix(in srgb, var(--sep) 50%, transparent); }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff;
+            font: 700 17px var(--rounded); flex: none; }
+  .row-main { flex: 1; min-width: 0; }
+  .row-name { font-weight: 600; font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub { color: var(--secondary); font-size: 15px; margin-top: 2px; }
+  .row-days { text-align: right; }
+  .row-days b { font: 600 17px var(--rounded); font-variant-numeric: tabular-nums; display: block; }
+  .row-days span { font-size: 12px; color: var(--secondary); }
+  .chev { color: var(--sep); font-size: 20px; }
+  .edit-ctrls { display: flex; gap: 4px; }
+  .icon-btn { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; background: var(--field); }
+  .icon-btn.del { background: var(--danger); color: #fff; }
+  .icon-btn:disabled { opacity: .3; }
+
+  .empty { text-align: center; padding: 18vh 24px 0; }
+  .empty .big { font-size: 56px; }
+  .empty h2 { margin: 12px 0 6px; font-size: 22px; }
+  .empty p { color: var(--secondary); margin: 0 auto 20px; max-width: 320px; line-height: 1.4; }
+  .btn-primary { background: var(--accent); color: #fff; font-weight: 600; padding: 12px 22px; border-radius: 14px; font-size: 17px; }
+
+  .footer { margin-top: 28px; text-align: center; color: var(--secondary); font-size: 13px; line-height: 1.6; }
+  .footer button { color: var(--accent); font-size: 15px; padding: 6px 10px; }
+
+  /* Dashboard */
+  .stack { display: grid; gap: 16px; padding-top: 8px; }
+  .header-card { color: #fff; border-radius: 24px; padding: 20px; }
+  .header-card .lbl { font-size: 15px; opacity: .85; }
+  .header-card .date { font: 700 34px/1.15 var(--rounded); margin: 8px 0 10px; }
+  .header-card .meta { font-size: 15px; font-weight: 500; opacity: .92; }
+  .header-card hr { border: 0; border-top: 1px solid rgba(255,255,255,.4); margin: 12px 0; }
+  .header-card .age { font-weight: 600; font-size: 17px; }
+  .card { background: var(--card); border-radius: var(--radius); }
+  .seconds { text-align: center; padding: 20px 12px; }
+  .seconds b { display: block; font: 700 clamp(28px, 10vw, 40px) var(--rounded); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .seconds span { color: var(--secondary); font-size: 15px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
+  .tile { padding: 16px; }
+  .tile .ico { font-size: 22px; }
+  .tile b { display: block; font: 700 clamp(18px, 5.6vw, 24px) var(--rounded); font-variant-numeric: tabular-nums; margin: 8px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile span { color: var(--secondary); font-size: 15px; }
+  .bday { display: flex; align-items: center; gap: 14px; padding: 16px; }
+  .bday .ico { font-size: 30px; }
+  .bday b { display: block; font-size: 17px; }
+  .bday span { color: var(--secondary); font-size: 15px; }
+
+  /* Sheet (editor) */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 20; display: flex; align-items: flex-end; justify-content: center;
+             animation: fade .2s ease; }
+  .sheet { background: var(--bg); width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; border-radius: 14px 14px 0 0;
+           padding-bottom: calc(24px + env(safe-area-inset-bottom)); animation: up .28s cubic-bezier(.2,.9,.3,1); }
+  @media (min-width: 700px) { .overlay { align-items: center; } .sheet { border-radius: 14px; } }
+  @keyframes up { from { transform: translateY(40px); opacity: .5; } }
+  @keyframes fade { from { opacity: 0; } }
+  .sheet-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; position: sticky; top: 0; background: var(--bg); z-index: 1; }
+  .sheet-bar .t { font-weight: 600; font-size: 17px; }
+  .sheet-bar button { color: var(--accent); font-size: 17px; }
+  .sheet-bar button.bold { font-weight: 600; }
+  .sheet-bar button:disabled { color: var(--secondary); opacity: .6; cursor: default; }
+  .sec-h { color: var(--secondary); font-size: 13px; text-transform: uppercase; margin: 18px 32px 6px; }
+  .group { background: var(--card); border-radius: 12px; margin: 0 16px; }
+  .field { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 6px 16px; position: relative; font-size: 17px; }
+  .field + .field::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; border-top: .5px solid var(--sep); }
+  .field input[type=text] { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: 17px var(--font); padding: 8px 0; }
+  .field input[type=date], .field input[type=time] { border: 0; outline: 0; background: var(--field); color: var(--text); font: 17px var(--font);
+            padding: 6px 10px; border-radius: 8px; min-height: 34px; }
+  .foot { color: var(--secondary); font-size: 13px; margin: 6px 32px 0; line-height: 1.35; }
+  .switch { position: relative; width: 51px; height: 31px; flex: none; }
+  .switch input { opacity: 0; width: 100%; height: 100%; position: absolute; margin: 0; cursor: pointer; z-index: 1; }
+  .switch i { position: absolute; inset: 0; background: var(--sep); border-radius: 31px; transition: background .2s; }
+  .switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+                     box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .2s; }
+  .switch input:checked + i { background: #34c759; }
+  .switch input:checked + i::after { transform: translateX(20px); }
+  .swatches { display: flex; justify-content: space-between; padding: 12px 16px; }
+  .sw { width: 34px; height: 34px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 14px; display: grid; place-items: center; }
+  .sw.on { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--text); }
+  .danger-btn { color: var(--danger); width: 100%; text-align: center; padding: 14px; font-size: 17px; }
+
+  .banner { background: var(--card); border-radius: 14px; padding: 12px 14px; margin: 0 0 16px; font-size: 14px; line-height: 1.4; display: flex; gap: 10px; align-items: flex-start; }
+  .banner button { color: var(--secondary); font-size: 18px; margin-left: auto; }
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: rgba(0,0,0,.8); color: #fff;
+           padding: 10px 16px; border-radius: 20px; font-size: 14px; z-index: 30; animation: fade .2s; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<input id="importFile" type="file" accept="application/json,.json" hidden>
+
+<script>
+'use strict';
+
+/* ---------- Themes (same colours as the iPhone app) ---------- */
+const C = { pink: '#ff2d55', purple: '#af52de', indigo: '#5856d6', orange: '#ff9500', red: '#ff3b30',
+            teal: '#30b0c7', blue: '#007aff', green: '#34c759', yellow: '#ffcc00' };
+const THEMES = [
+  [C.pink, C.purple, C.indigo],
+  [C.orange, C.pink, C.red],
+  [C.teal, C.blue, C.indigo],
+  [C.green, C.teal, C.blue],
+  [C.yellow, C.orange, C.pink],
+  [C.indigo, C.purple, C.pink],
+];
+const themeColors = (i) => THEMES[((i % THEMES.length) + THEMES.length) % THEMES.length];
+const gradient = (i) => `linear-gradient(135deg, ${themeColors(i).join(', ')})`;
+
+/* ---------- Storage ---------- */
+const KEY = 'lifetime.people.v1';
+function loadPeople() {
+  try { const a = JSON.parse(localStorage.getItem(KEY) || '[]'); return Array.isArray(a) ? a.filter(validPerson) : []; }
+  catch { return []; }
+}
+function validPerson(p) { return p && typeof p.id === 'string' && typeof p.name === 'string' && Number.isFinite(p.birth); }
+function savePeople() { localStorage.setItem(KEY, JSON.stringify(people)); }
+let people = loadPeople();
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+function nextThemeIndex() {
+  const counts = THEMES.map((_, i) => people.filter((p) => p.themeIndex === i).length);
+  return counts.indexOf(Math.min(...counts));
+}
+function initials(name) {
+  const s = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => [...w][0]).join('');
+  return s ? s.toUpperCase() : '?';
+}
+
+/* ---------- Life maths (ported from LifeStats.swift) ---------- */
+const DAY = 86400000;
+const dayIndex = (d) => Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY);
+const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+function addMonths(d, n) {
+  const m = d.getMonth() + n, y = d.getFullYear() + Math.floor(m / 12), mm = ((m % 12) + 12) % 12;
+  const last = new Date(y, mm + 1, 0).getDate();
+  return new Date(y, mm, Math.min(d.getDate(), last), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+}
+function wholeDays(from, to) { // completed calendar days, respecting time of day
+  let n = dayIndex(to) - dayIndex(from);
+  const tFrom = from - startOfDay(from), tTo = to - startOfDay(to);
+  if (n > 0 && tTo < tFrom) n--;
+  return Math.max(0, n);
+}
+
+const SYNODIC = 29.530588853 * DAY;
+const REF_NEW = 947182440 * 1000;           // 6 Jan 2000, 18:14 UTC
+const REF_FULL = REF_NEW + SYNODIC / 2;
+const PHASES = [['New Moon', '🌑'], ['Waxing Crescent', '🌒'], ['First Quarter', '🌓'], ['Waxing Gibbous', '🌔'],
+                ['Full Moon', '🌕'], ['Waning Gibbous', '🌖'], ['Last Quarter', '🌗'], ['Waning Crescent', '🌘']];
+function fullMoons(start, end) {
+  if (end <= start) return 0;
+  const idx = (t) => Math.floor((t - REF_FULL) / SYNODIC);
+  return idx(end) - idx(start);
+}
+function moonPhase(t) {
+  const x = (t - REF_NEW) / SYNODIC, age = x - Math.floor(x);
+  return PHASES[Math.round(age * 8) % 8];
+}
+
+function stats(person, now = new Date()) {
+  const birth = new Date(person.birth);
+  const ms = Math.max(0, now - birth);
+  const seconds = Math.floor(ms / 1000);
+  const days = Math.max(0, dayIndex(now) - dayIndex(birth));
+
+  let months = (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
+  if (addMonths(birth, months) > now) months--;
+  months = Math.max(0, months);
+  const age = { years: Math.floor(months / 12), months: months % 12, days: wholeDays(addMonths(birth, months), now) };
+
+  const today = startOfDay(now);
+  let next = new Date(today.getFullYear(), birth.getMonth(), birth.getDate()); // 29 Feb -> 1 Mar in non-leap years
+  if (next < today) next = new Date(today.getFullYear() + 1, birth.getMonth(), birth.getDate());
+  const daysUntilBirthday = dayIndex(next) - dayIndex(today);
+
+  return {
+    birth, seconds, minutes: Math.floor(seconds / 60), hours: Math.floor(seconds / 3600),
+    days, weeks: Math.floor(days / 7), months, age,
+    fullMoons: fullMoons(birth.getTime(), now.getTime()),
+    moon: moonPhase(birth.getTime()),
+    weekday: birth.toLocaleDateString(undefined, { weekday: 'long' }),
+    nextBirthday: next, daysUntilBirthday, isBirthdayToday: daysUntilBirthday === 0,
+  };
+}
+
+/* ---------- Helpers ---------- */
+const num = (n) => n.toLocaleString();
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (d, o) => d.toLocaleDateString(undefined, o);
+const pad = (n) => String(n).padStart(2, '0');
+const $app = document.getElementById('app');
+function toast(msg) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+/* ---------- Routing ---------- */
+let editing = false; // list edit mode
+function route() {
+  const m = location.hash.match(/^#\/p\/(.+)$/);
+  const id = m && decodeURIComponent(m[1]);
+  if (id && people.some((p) => p.id === id)) renderDashboard(id);
+  else { if (location.hash) history.replaceState(null, '', location.pathname + location.search); renderList(); }
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', route);
+
+/* ---------- List screen ---------- */
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = window.navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+
+function renderList() {
+  current = { view: 'list' };
+  if (!people.length) editing = false;
+  const now = new Date();
+  const showHint = isIOS && !isStandalone && localStorage.getItem('lifetime.hintDismissed') !== '1';
+
+  const rows = people.map((p, i) => {
+    const s = stats(p, now);
+    const right = editing
+      ? `<div class="edit-ctrls">
+           <span class="icon-btn" role="button" data-act="up" data-i="${i}" aria-label="Move up" ${i === 0 ? 'aria-disabled="true" style="opacity:.3"' : ''}>↑</span>
+           <span class="icon-btn" role="button" data-act="down" data-i="${i}" aria-label="Move down" ${i === people.length - 1 ? 'aria-disabled="true" style="opacity:.3"' : ''}>↓</span>
+           <span class="icon-btn del" role="button" data-act="del" data-i="${i}" aria-label="Delete">✕</span>
+         </div>`
+      : `<div class="row-days"><b>${num(s.days)}</b><span>${s.isBirthdayToday ? '🎂 today' : 'days'}</span></div><span class="chev">›</span>`;
+    return `<button class="row" data-open="${esc(p.id)}">
+        <div class="avatar" style="background:${gradient(p.themeIndex)}">${esc(initials(p.name))}</div>
+        <div class="row-main">
+          <div class="row-name">${esc(p.name)}</div>
+          <div class="row-sub">Born ${fmt(s.birth, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</div>
+        </div>${right}
+      </button>`;
+  }).join('');
+
+  $app.innerHTML = `
+    <div class="nav"><div class="nav-inner">
+      <button class="nav-btn" data-act="edit" ${people.length ? '' : 'style="visibility:hidden"'}>${editing ? 'Done' : 'Edit'}</button>
+      <div class="nav-title"></div>
+      <button class="nav-btn right plus" data-act="add" aria-label="Add person">+</button>
+    </div></div>
+    <div class="wrap">
+      <h1 class="large-title">Lifetime</h1>
+      ${showHint ? `<div class="banner"><div>📲 <b>Install on your iPhone:</b> tap the <b>Share</b> button in Safari, then <b>Add to Home Screen</b>. It will open full-screen like a normal app.</div><button data-act="hint" aria-label="Dismiss">✕</button></div>` : ''}
+      ${people.length ? `<div class="list">${rows}</div>` : `
+        <div class="empty">
+          <div class="big">🎂</div>
+          <h2>No one yet</h2>
+          <p>Add yourself, family and friends to count every day, minute and full moon since they were born.</p>
+          <button class="btn-primary" data-act="add">Add a Person</button>
+        </div>`}
+      <div class="footer">
+        <div>Your data stays on this device.</div>
+        <button data-act="export">Back up</button>·<button data-act="import">Restore</button>
+      </div>
+    </div>`;
+}
+
+$app.addEventListener('click', (e) => {
+  const act = e.target.closest('[data-act]');
+  if (act) {
+    e.stopPropagation();
+    const a = act.dataset.act, i = Number(act.dataset.i);
+    if (act.getAttribute('aria-disabled') === 'true') return;
+    if (a === 'add') openEditor(null);
+    else if (a === 'edit') { editing = !editing; renderList(); }
+    else if (a === 'up' && i > 0) { [people[i - 1], people[i]] = [people[i], people[i - 1]]; savePeople(); renderList(); }
+    else if (a === 'down' && i < people.length - 1) { [people[i + 1], people[i]] = [people[i], people[i + 1]]; savePeople(); renderList(); }
+    else if (a === 'del') { const p = people[i]; if (confirm(`Delete ${p.name}?`)) { people.splice(i, 1); savePeople(); renderList(); } }
+    else if (a === 'back') location.hash = '';
+    else if (a === 'editPerson') openEditor(act.dataset.id);
+    else if (a === 'hint') { localStorage.setItem('lifetime.hintDismissed', '1'); renderList(); }
+    else if (a === 'export') exportData();
+    else if (a === 'import') document.getElementById('importFile').click();
+    return;
+  }
+  const open = e.target.closest('[data-open]');
+  if (open && !editing) location.hash = '#/p/' + encodeURIComponent(open.dataset.open);
+});
+
+/* ---------- Dashboard screen ---------- */
+let current = { view: 'list' };
+const TILES = [['minutes', 'Minutes', '⏰'], ['hours', 'Hours', '⏳'], ['days', 'Days', '☀️'],
+               ['weeks', 'Weeks', '📅'], ['months', 'Months', '🗓️'], ['fullMoons', 'Full Moons', '🌕']];
+
+function renderDashboard(id) {
+  current = { view: 'dash', id };
+  const p = people.find((x) => x.id === id);
+  const s = stats(p);
+  const accent = themeColors(p.themeIndex)[0];
+  $app.innerHTML = `
+    <div class="nav"><div class="nav-inner">
+      <button class="nav-btn" data-act="back">‹ Lifetime</button>
+      <div class="nav-title">${esc(p.name)}</div>
+      <button class="nav-btn right" data-act="editPerson" data-id="${esc(p.id)}">Edit</button>
+    </div></div>
+    <div class="wrap"><div class="stack">
+      <div class="header-card" style="background:${gradient(p.themeIndex)}">
+        <div class="lbl">${esc(p.name)} was born on</div>
+        <div class="date">${fmt(s.birth, { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        <div class="meta">📅 a ${s.weekday} &nbsp;·&nbsp; ${s.moon[1]} ${s.moon[0]}</div>
+        <hr>
+        <div class="age" data-k="age"></div>
+      </div>
+      <div class="card seconds"><b data-k="seconds"></b><span>seconds alive</span></div>
+      <div class="grid">
+        ${TILES.map(([k, label, ico]) => `<div class="card tile"><div class="ico">${ico}</div><b data-k="${k}"></b><span>${label}</span></div>`).join('')}
+      </div>
+      <div class="card bday"><div class="ico" style="color:${accent}">🎁</div>
+        <div><b data-k="bdayTitle"></b><span data-k="bdayDate"></span></div></div>
+    </div></div>`;
+  tickDashboard();
+}
+
+function tickDashboard() {
+  const p = people.find((x) => x.id === current.id);
+  if (!p) return;
+  const s = stats(p);
+  const set = (k, v) => { const el = $app.querySelector(`[data-k="${k}"]`); if (el && el.textContent !== v) el.textContent = v; };
+  set('seconds', num(s.seconds));
+  for (const [k] of TILES) set(k, num(s[k]));
+  set('age', `${s.age.years} years, ${s.age.months} months, ${s.age.days} days old`);
+  set('bdayTitle', s.isBirthdayToday ? 'Happy birthday! 🎉' : `${s.daysUntilBirthday} ${s.daysUntilBirthday === 1 ? 'day' : 'days'} until the birthday`);
+  set('bdayDate', fmt(s.nextBirthday, { weekday: 'long', day: 'numeric', month: 'long' }));
+}
+
+let lastMinute = new Date().getMinutes(), lastDay = new Date().getDate();
+setInterval(() => {
+  if (document.hidden) return;
+  const now = new Date();
+  if (current.view === 'dash') tickDashboard();
+  if (now.getMinutes() !== lastMinute) {
+    lastMinute = now.getMinutes();
+    if (current.view === 'list' && !document.querySelector('.overlay')) renderList();
+  }
+  if (now.getDate() !== lastDay && current.view === 'dash') { lastDay = now.getDate(); renderDashboard(current.id); }
+}, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !document.querySelector('.overlay')) route(); });
+
+/* ---------- Editor sheet (ported from PersonEditorView.swift) ---------- */
+function openEditor(id) {
+  const person = id ? people.find((p) => p.id === id) : null;
+  const def = new Date(); def.setFullYear(def.getFullYear() - 25);
+  const b = person ? new Date(person.birth) : def;
+  const knows = person ? (b.getHours() !== 0 || b.getMinutes() !== 0) : false;
+  let theme = person ? person.themeIndex : nextThemeIndex();
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="${person ? 'Edit Person' : 'New Person'}">
+      <div class="sheet-bar">
+        <button data-e="cancel">Cancel</button>
+        <div class="t">${person ? 'Edit Person' : 'New Person'}</div>
+        <button class="bold" data-e="save">${person ? 'Save' : 'Add'}</button>
+      </div>
+      <div class="sec-h">Name</div>
+      <div class="group"><label class="field"><input type="text" id="fName" placeholder="Name" autocomplete="name" maxlength="60" value="${person ? esc(person.name) : ''}"></label></div>
+      <div class="sec-h">Birth</div>
+      <div class="group">
+        <label class="field">Date of birth <input type="date" id="fDate" max="${todayStr}" value="${b.getFullYear()}-${pad(b.getMonth() + 1)}-${pad(b.getDate())}"></label>
+        <label class="field">Known birth time <span class="switch"><input type="checkbox" id="fKnows" ${knows ? 'checked' : ''}><i></i></span></label>
+        <label class="field" id="timeRow" ${knows ? '' : 'hidden'}>Time of birth <input type="time" id="fTime" value="${knows ? `${pad(b.getHours())}:${pad(b.getMinutes())}` : '12:00'}"></label>
+      </div>
+      <div class="foot" id="timeFoot"></div>
+      <div class="sec-h">Colour</div>
+      <div class="group"><div class="swatches">
+        ${THEMES.map((_, i) => `<button class="sw" data-sw="${i}" style="background:${gradient(i)}" aria-label="Colour ${i + 1}"></button>`).join('')}
+      </div></div>
+      ${person ? `<div class="group" style="margin-top:28px"><button class="danger-btn" data-e="delete">Delete Person</button></div>` : ''}
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+
+  const q = (s) => ov.querySelector(s);
+  const fName = q('#fName'), fDate = q('#fDate'), fKnows = q('#fKnows'), fTime = q('#fTime');
+  const saveBtn = q('[data-e="save"]');
+  const sync = () => {
+    saveBtn.disabled = !fName.value.trim() || !fDate.value;
+    q('#timeRow').hidden = !fKnows.checked;
+    q('#timeFoot').textContent = fKnows.checked ? 'Minutes and seconds are counted from the exact birth time.'
+                                                : 'Without a time, counting starts at midnight on the birthday.';
+    ov.querySelectorAll('[data-sw]').forEach((el) => {
+      const on = Number(el.dataset.sw) === theme;
+      el.classList.toggle('on', on); el.textContent = on ? '✓' : '';
+    });
+  };
+  sync();
+  if (!person) setTimeout(() => fName.focus(), 50);
+
+  const close = () => { ov.remove(); document.body.style.overflow = ''; document.removeEventListener('keydown', onKey); };
+  const save = () => {
+    if (saveBtn.disabled) return;
+    const [y, m, d] = fDate.value.split('-').map(Number);
+    let hh = 0, mm = 0;
+    if (fKnows.checked && fTime.value) [hh, mm] = fTime.value.split(':').map(Number);
+    const birth = Math.min(new Date(y, m - 1, d, hh, mm).getTime(), Date.now());
+    const updated = { id: person ? person.id : uid(), name: fName.value.trim(), birth, themeIndex: theme };
+    const i = people.findIndex((p) => p.id === updated.id);
+    if (i >= 0) people[i] = updated; else people.push(updated);
+    savePeople(); close(); route();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); if (e.key === 'Enter' && e.target === fName) save(); };
+  document.addEventListener('keydown', onKey);
+
+  ov.addEventListener('input', sync);
+  ov.addEventListener('change', sync);
+  ov.addEventListener('click', (e) => {
+    if (e.target === ov) return close();
+    const sw = e.target.closest('[data-sw]');
+    if (sw) { theme = Number(sw.dataset.sw); sync(); return; }
+    const a = e.target.closest('[data-e]');
+    if (!a) return;
+    if (a.dataset.e === 'cancel') close();
+    else if (a.dataset.e === 'save') save();
+    else if (a.dataset.e === 'delete' && confirm(`Delete ${person.name}?`)) {
+      people = people.filter((p) => p.id !== person.id); savePeople(); close(); location.hash = ''; route();
+    }
+  });
+}
+
+/* ---------- Backup / restore ---------- */
+function exportData() {
+  if (!people.length) return toast('Nothing to back up yet');
+  const blob = new Blob([JSON.stringify({ app: 'Lifetime', version: 1, people }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `lifetime-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+document.getElementById('importFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    const incoming = (Array.isArray(data) ? data : data.people || []).filter(validPerson)
+      .map((p) => ({ id: p.id, name: p.name.slice(0, 60), birth: p.birth, themeIndex: Number(p.themeIndex) || 0 }));
+    if (!incoming.length) return toast('No people found in that file');
+    let added = 0;
+    for (const p of incoming) {
+      const i = people.findIndex((x) => x.id === p.id);
+      if (i >= 0) people[i] = p; else { people.push(p); added++; }
+    }
+    savePeople(); route();
+    toast(`Restored ${incoming.length} ${incoming.length === 1 ? 'person' : 'people'}`);
+  } catch { toast('That file could not be read'); }
+});
+
+/* ---------- Start ---------- */
+route();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
